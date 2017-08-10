@@ -49,8 +49,8 @@ elif [[ "$PLATFORM" == 'darwin' ]]; then
    runtime_id='osx.10.11-x64'
 fi
 
-build_dirs=("Microsoft.VisualStudio.Services.Agent" "Agent.Listener" "Agent.Worker" "Test")
-build_clean_dirs=("Agent.Listener" "Test" "Agent.Worker" "Microsoft.VisualStudio.Services.Agent")
+build_dirs=("Microsoft.VisualStudio.Services.Agent" "Agent.Listener" "Agent.Worker")
+build_clean_dirs=("Agent.Listener" "Agent.Worker" "Microsoft.VisualStudio.Services.Agent")
 bin_layout_dirs=("Agent.Listener" "Microsoft.VisualStudio.Services.Agent" "Agent.Worker")
 WINDOWSAGENTSERVICE_PROJFILE="Agent.Service/Windows/AgentService.csproj"
 WINDOWSAGENTSERVICE_BIN="Agent.Service/Windows/bin/Debug"
@@ -90,7 +90,7 @@ function rundotnet ()
     dotnet_cmd=${1}
     err_handle=${2:-failed}
 
-    if [[ ( "${!3}" == "" ) ]]; then
+    if [[ ( "${3}" != "" ) ]]; then
         run_dirs=("${3}")
     else 
         run_dirs=("${!3}")

@@ -88,6 +88,24 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
                 saveProxySetting = true;
             }
 
+            // Populate cert setting from commandline args
+            var agentCertManager = HostContext.GetService<IAgentCertificateManager>();
+            bool saveCertSetting = false;
+            // string proxyUrl = command.GetProxyUrl();
+            // if (!string.IsNullOrEmpty(proxyUrl))
+            // {
+            //     if (!Uri.IsWellFormedUriString(proxyUrl, UriKind.Absolute))
+            //     {
+            //         throw new ArgumentOutOfRangeException(nameof(proxyUrl));
+            //     }
+
+            //     Trace.Info("Reset proxy base on commandline args.");
+            //     string proxyUserName = command.GetProxyUserName();
+            //     string proxyPassword = command.GetProxyPassword();
+            //     (vstsProxy as VstsAgentWebProxy).SetupProxy(proxyUrl, proxyUserName, proxyPassword);
+            //     saveProxySetting = true;
+            // }
+
             AgentSettings agentSettings = new AgentSettings();
             // TEE EULA
             agentSettings.AcceptTeeEula = false;

@@ -13,6 +13,7 @@ using Microsoft.TeamFoundation.DistributedTask.Orchestration.Server.Pipelines;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Agent.Listener.Configuration;
 using Microsoft.VisualStudio.Services.Agent.Util;
+using Microsoft.VisualStudio.Services.WebApi;
 using Newtonsoft.Json;
 using Pipelines = Microsoft.TeamFoundation.DistributedTask.Orchestration.Server.Pipelines;
 

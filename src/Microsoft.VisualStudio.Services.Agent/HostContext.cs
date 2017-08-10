@@ -25,7 +25,7 @@ namespace Microsoft.VisualStudio.Services.Agent
         T GetService<T>() where T : class, IAgentService;
         void SetDefaultCulture(string name);
         event EventHandler Unloading;
-        StartupType StartupType {get; set;}
+        StartupType StartupType { get; set; }
         CancellationToken AgentShutdownToken { get; }
         ShutdownReason AgentShutdownReason { get; }
         void ShutdownAgent(ShutdownReason reason);
@@ -449,6 +449,9 @@ namespace Microsoft.VisualStudio.Services.Agent
             HttpClientHandler clientHandler = new HttpClientHandler();
             var agentWebProxy = context.GetService<IVstsAgentWebProxy>();
             clientHandler.Proxy = agentWebProxy;
+            var agentCert = context.GetService<IAgentCertificateManager>();
+            clientHandler.ClientCertificateOptions = ClientCertificateOption.Manual;
+            clientHandler.ClientCertificates.AddRange(agentCert.ClientCertificates);
             return clientHandler;
         }
     }
