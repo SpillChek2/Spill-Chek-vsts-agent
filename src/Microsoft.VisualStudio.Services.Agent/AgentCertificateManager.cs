@@ -81,6 +81,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                 };
 
                 IOUtil.SaveObject(setting, certSettingFile);
+                File.SetAttributes(certSettingFile, File.GetAttributes(certSettingFile) | FileAttributes.Hidden);
             }
             else
             {
@@ -138,7 +139,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                 ClientCertificateArchiveFile = certSetting.ClientCertArchive;
 
                 var cerdStore = HostContext.GetService<IAgentCredentialStore>();
-                ClientCertificatePassword = cerdStore.Read(certSetting.ClientCertPasswordLookupKey).Password;
+                ClientCertificatePassword = cerdStore.Read($"VSTS_AGENT_CLIENT_CERT_PASSWORD_{certSetting.ClientCertPasswordLookupKey}").Password;
 
                 var secretMasker = HostContext.GetService<ISecretMasker>();
                 secretMasker.AddValue(ClientCertificatePassword);

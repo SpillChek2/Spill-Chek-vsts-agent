@@ -103,10 +103,15 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
                 !string.IsNullOrEmpty(clientCertArchive) &&
                 !string.IsNullOrEmpty(clientCertPassword))
             {
-                ArgUtil.File(Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), caCert), nameof(caCert));
-                ArgUtil.File(Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCert), nameof(clientCert));
-                ArgUtil.File(Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertKey), nameof(clientCertKey));
-                ArgUtil.File(Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertArchive), nameof(clientCertArchive));
+                caCert = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), caCert);
+                clientCert = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCert);
+                clientCertKey = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertKey);
+                clientCertArchive = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertArchive);
+
+                ArgUtil.File(caCert, nameof(caCert));
+                ArgUtil.File(clientCert, nameof(clientCert));
+                ArgUtil.File(clientCertKey, nameof(clientCertKey));
+                ArgUtil.File(clientCertArchive, nameof(clientCertArchive));
 
                 Trace.Info("Reset client cert setting base on commandline args.");
                 (agentCertManager as AgentCertificateManager).SetupCertificate(caCert, clientCert, clientCertKey, clientCertArchive, clientCertPassword);
