@@ -390,6 +390,31 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
             return GetArg(Constants.Agent.CommandLine.Args.ProxyPassword);
         }
 
+        public string GetCACertificate()
+        {
+            return GetArg(Constants.Agent.CommandLine.Args.SslCaCert);
+        }
+
+        public string GetClientCertificate()
+        {
+            return GetArg(Constants.Agent.CommandLine.Args.SslClientCert);
+        }
+
+        public string GetClientCertificatePrivateKey()
+        {
+            return GetArg(Constants.Agent.CommandLine.Args.SslClientCertKey);
+        }
+
+        public string GetClientCertificateArchrive()
+        {
+            return GetArg(Constants.Agent.CommandLine.Args.SslClientCertArchive);
+        }
+
+        public string GetClientCertificatePassword()
+        {
+            return GetArg(Constants.Agent.CommandLine.Args.SslClientCertPassword);
+        }
+
         public void SetUnattended()
         {
             _parser.Flags.Add(Constants.Agent.CommandLine.Flags.Unattended);
