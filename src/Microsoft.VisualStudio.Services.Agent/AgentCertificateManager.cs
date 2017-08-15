@@ -30,18 +30,27 @@ namespace Microsoft.VisualStudio.Services.Agent
         // This should only be called from config
         public void SetupCertificate(string caCert, string clientCert, string clientCertPrivateKey, string clientCertArchive, string clientCertPassword)
         {
-            ArgUtil.File(caCert, nameof(caCert));
-            ArgUtil.File(clientCert, nameof(clientCert));
-            ArgUtil.File(clientCertPrivateKey, nameof(clientCertPrivateKey));
-            ArgUtil.File(clientCertArchive, nameof(clientCertArchive));
-            ArgUtil.NotNullOrEmpty(clientCertPassword, nameof(clientCertPassword));
-
             Trace.Info("Setup agent certificate setting base on configuration inputs.");
-            Trace.Info($"CA '{caCert}'");
-            Trace.Info($"Client cert '{clientCert}'");
-            Trace.Info($"Client cert private key '{clientCertPrivateKey}'");
-            Trace.Info($"Client cert archive '{clientCertArchive}'");
 
+            if (!string.IsNullOrEmpty(caCert))
+            {
+                ArgUtil.File(caCert, nameof(caCert));
+                Trace.Info($"Self-Signed CA '{caCert}'");
+            }
+
+            if (!string.IsNullOrEmpty(clientCert))
+            {
+                ArgUtil.File(clientCert, nameof(clientCert));
+                ArgUtil.File(clientCertPrivateKey, nameof(clientCertPrivateKey));
+                ArgUtil.File(clientCertArchive, nameof(clientCertArchive));
+                ArgUtil.NotNullOrEmpty(clientCertPassword, nameof(clientCertPassword));
+
+                Trace.Info($"Client cert '{clientCert}'");
+                Trace.Info($"Client cert private key '{clientCertPrivateKey}'");
+                Trace.Info($"Client cert archive '{clientCertArchive}'");
+            }
+
+            // TODO: Setup ServicePointManager.ServerCertificateValidationCallback when adopt netcore 2.0 to support self-signed cert for agent infrastructure.
             CACertificateFile = caCert;
             ClientCertificateFile = clientCert;
             ClientCertificatePrivateKeyFile = clientCertPrivateKey;
@@ -49,20 +58,31 @@ namespace Microsoft.VisualStudio.Services.Agent
             ClientCertificatePassword = clientCertPassword;
 
             _clientCertificates.Clear();
-            _clientCertificates.Add(new X509Certificate2(ClientCertificateArchiveFile, ClientCertificatePassword));
+            if (!string.IsNullOrEmpty(ClientCertificateArchiveFile))
+            {
+                _clientCertificates.Add(new X509Certificate2(ClientCertificateArchiveFile, ClientCertificatePassword));
+            }
         }
 
         // This should only be called from config
         public void SaveCertificateSetting()
         {
-            if (!string.IsNullOrEmpty(CACertificateFile) &&
-                !string.IsNullOrEmpty(ClientCertificateFile) &&
+            string certSettingFile = IOUtil.GetAgentCertificateSettingFilePath();
+            IOUtil.DeleteFile(certSettingFile);
+
+            var setting = new AgentCertificateSetting();
+            if (!string.IsNullOrEmpty(CACertificateFile))
+            {
+                Trace.Info($"Store CA cert setting to '{certSettingFile}'");
+                setting.CACert = CACertificateFile;
+            }
+
+            if (!string.IsNullOrEmpty(ClientCertificateFile) &&
                 !string.IsNullOrEmpty(ClientCertificatePrivateKeyFile) &&
                 !string.IsNullOrEmpty(ClientCertificateArchiveFile) &&
                 !string.IsNullOrEmpty(ClientCertificatePassword))
             {
-                string certSettingFile = IOUtil.GetAgentCertificateSettingFilePath();
-                IOUtil.DeleteFile(certSettingFile);
+                Trace.Info($"Store client cert settings to '{certSettingFile}'");
 
                 string lookupKey = Guid.NewGuid().ToString("D").ToUpperInvariant();
                 Trace.Info($"Store client cert private key password with lookup key {lookupKey}");
@@ -70,22 +90,17 @@ namespace Microsoft.VisualStudio.Services.Agent
                 var credStore = HostContext.GetService<IAgentCredentialStore>();
                 credStore.Write($"VSTS_AGENT_CLIENT_CERT_PASSWORD_{lookupKey}", "VSTS", ClientCertificatePassword);
 
-                Trace.Info($"Store certificate settings to '{certSettingFile}'");
-                var setting = new AgentCertificateSetting()
-                {
-                    CACert = CACertificateFile,
-                    ClientCert = ClientCertificateFile,
-                    ClientCertPrivatekey = ClientCertificatePrivateKeyFile,
-                    ClientCertArchive = ClientCertificateArchiveFile,
-                    ClientCertPasswordLookupKey = lookupKey
-                };
+                setting.ClientCert = ClientCertificateFile;
+                setting.ClientCertPrivatekey = ClientCertificatePrivateKeyFile;
+                setting.ClientCertArchive = ClientCertificateArchiveFile;
+                setting.ClientCertPasswordLookupKey = lookupKey;
+            }
 
+            if (!string.IsNullOrEmpty(CACertificateFile) ||
+                !string.IsNullOrEmpty(ClientCertificateFile))
+            {
                 IOUtil.SaveObject(setting, certSettingFile);
                 File.SetAttributes(certSettingFile, File.GetAttributes(certSettingFile) | FileAttributes.Hidden);
-            }
-            else
-            {
-                Trace.Info("No certificate setting found.");
             }
         }
 
@@ -119,32 +134,39 @@ namespace Microsoft.VisualStudio.Services.Agent
                 var certSetting = IOUtil.LoadObject<AgentCertificateSetting>(certSettingFile);
                 ArgUtil.NotNull(certSetting, nameof(AgentCertificateSetting));
 
-                // make sure all settings exist                
-                ArgUtil.File(certSetting.CACert, nameof(certSetting.CACert));
-                ArgUtil.File(certSetting.ClientCert, nameof(certSetting.ClientCert));
-                ArgUtil.File(certSetting.ClientCertPrivatekey, nameof(certSetting.ClientCertPrivatekey));
-                ArgUtil.File(certSetting.ClientCertArchive, nameof(certSetting.ClientCertArchive));
-                ArgUtil.NotNullOrEmpty(certSetting.ClientCertPasswordLookupKey, nameof(certSetting.ClientCertPasswordLookupKey));
+                // make sure all settings file exist
+                if (!string.IsNullOrEmpty(certSetting.CACert))
+                {
+                    ArgUtil.File(certSetting.CACert, nameof(certSetting.CACert));
+                    Trace.Info($"CA '{certSetting.CACert}'");
+                    CACertificateFile = certSetting.CACert;
+                    // TODO: Setup ServicePointManager.ServerCertificateValidationCallback when adopt netcore 2.0 to support self-signed cert for agent infrastructure.
+                }
 
-                Trace.Info($"CA '{certSetting.CACert}'");
-                CACertificateFile = certSetting.CACert;
+                if (!string.IsNullOrEmpty(certSetting.ClientCert))
+                {
+                    ArgUtil.File(certSetting.ClientCert, nameof(certSetting.ClientCert));
+                    ArgUtil.File(certSetting.ClientCertPrivatekey, nameof(certSetting.ClientCertPrivatekey));
+                    ArgUtil.File(certSetting.ClientCertArchive, nameof(certSetting.ClientCertArchive));
+                    ArgUtil.NotNullOrEmpty(certSetting.ClientCertPasswordLookupKey, nameof(certSetting.ClientCertPasswordLookupKey));
 
-                Trace.Info($"Client cert '{certSetting.ClientCert}'");
-                ClientCertificateFile = certSetting.ClientCert;
+                    Trace.Info($"Client cert '{certSetting.ClientCert}'");
+                    Trace.Info($"Client cert private key '{certSetting.ClientCertPrivatekey}'");
+                    Trace.Info($"Client cert archive '{certSetting.ClientCertArchive}'");
 
-                Trace.Info($"Client cert private key '{certSetting.ClientCertPrivatekey}'");
-                ClientCertificatePrivateKeyFile = certSetting.ClientCertPrivatekey;
+                    ClientCertificateFile = certSetting.ClientCert;
+                    ClientCertificatePrivateKeyFile = certSetting.ClientCertPrivatekey;
+                    ClientCertificateArchiveFile = certSetting.ClientCertArchive;
 
-                Trace.Info($"Client cert archive '{certSetting.ClientCertArchive}'");
-                ClientCertificateArchiveFile = certSetting.ClientCertArchive;
+                    var cerdStore = HostContext.GetService<IAgentCredentialStore>();
+                    ClientCertificatePassword = cerdStore.Read($"VSTS_AGENT_CLIENT_CERT_PASSWORD_{certSetting.ClientCertPasswordLookupKey}").Password;
 
-                var cerdStore = HostContext.GetService<IAgentCredentialStore>();
-                ClientCertificatePassword = cerdStore.Read($"VSTS_AGENT_CLIENT_CERT_PASSWORD_{certSetting.ClientCertPasswordLookupKey}").Password;
+                    var secretMasker = HostContext.GetService<ISecretMasker>();
+                    secretMasker.AddValue(ClientCertificatePassword);
 
-                var secretMasker = HostContext.GetService<ISecretMasker>();
-                secretMasker.AddValue(ClientCertificatePassword);
-
-                _clientCertificates.Add(new X509Certificate2(ClientCertificateArchiveFile, ClientCertificatePassword));
+                    _clientCertificates.Clear();
+                    _clientCertificates.Add(new X509Certificate2(ClientCertificateArchiveFile, ClientCertificatePassword));
+                }
             }
             else
             {

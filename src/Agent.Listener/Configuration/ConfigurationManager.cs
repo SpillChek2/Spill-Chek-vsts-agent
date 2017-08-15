@@ -97,37 +97,33 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
             string clientCertArchive = command.GetClientCertificateArchrive();
             string clientCertPassword = command.GetClientCertificatePassword();
 
-            if (!string.IsNullOrEmpty(caCert) &&
-                !string.IsNullOrEmpty(clientCert) &&
+            if (!string.IsNullOrEmpty(caCert))
+            {
+                caCert = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), caCert);
+                ArgUtil.File(caCert, nameof(caCert));
+            }
+
+            if (!string.IsNullOrEmpty(clientCert) &&
                 !string.IsNullOrEmpty(clientCertKey) &&
                 !string.IsNullOrEmpty(clientCertArchive) &&
                 !string.IsNullOrEmpty(clientCertPassword))
             {
-                caCert = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), caCert);
+                // Ensure all client cert pieces are there.
                 clientCert = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCert);
                 clientCertKey = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertKey);
                 clientCertArchive = Path.Combine(HostContext.GetDirectory(WellKnownDirectory.Root), clientCertArchive);
 
-                ArgUtil.File(caCert, nameof(caCert));
                 ArgUtil.File(clientCert, nameof(clientCert));
                 ArgUtil.File(clientCertKey, nameof(clientCertKey));
                 ArgUtil.File(clientCertArchive, nameof(clientCertArchive));
-
-                Trace.Info("Reset client cert setting base on commandline args.");
-                (agentCertManager as AgentCertificateManager).SetupCertificate(caCert, clientCert, clientCertKey, clientCertArchive, clientCertPassword);
-                saveCertSetting = true;
             }
-            else if (!string.IsNullOrEmpty(caCert) ||
-                !string.IsNullOrEmpty(clientCert) ||
-                !string.IsNullOrEmpty(clientCertKey) ||
-                !string.IsNullOrEmpty(clientCertArchive) ||
-                !string.IsNullOrEmpty(clientCertPassword))
+            else if (!string.IsNullOrEmpty(clientCert) ||
+                     !string.IsNullOrEmpty(clientCertKey) ||
+                     !string.IsNullOrEmpty(clientCertArchive) ||
+                     !string.IsNullOrEmpty(clientCertPassword))
             {
-                if (string.IsNullOrEmpty(caCert))
-                {
-                    throw new ArgumentNullException(Constants.Agent.CommandLine.Args.SslCaCert);
-                }
-                else if (string.IsNullOrEmpty(clientCert))
+                // Print out which args are missing.
+                if (string.IsNullOrEmpty(clientCert))
                 {
                     throw new ArgumentNullException(Constants.Agent.CommandLine.Args.SslClientCert);
                 }
@@ -143,6 +139,13 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
                 {
                     throw new ArgumentNullException(Constants.Agent.CommandLine.Args.SslClientCertPassword);
                 }
+            }
+
+            if (!string.IsNullOrEmpty(caCert) || !string.IsNullOrEmpty(clientCert))
+            {
+                Trace.Info("Reset agent cert setting base on commandline args.");
+                (agentCertManager as AgentCertificateManager).SetupCertificate(caCert, clientCert, clientCertKey, clientCertArchive, clientCertPassword);
+                saveCertSetting = true;
             }
 
             AgentSettings agentSettings = new AgentSettings();
@@ -398,7 +401,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
 
             if (saveCertSetting)
             {
-                Trace.Info("Save client cert setting to disk.");
+                Trace.Info("Save agent cert setting to disk.");
                 (agentCertManager as AgentCertificateManager).SaveCertificateSetting();
             }
 
@@ -540,7 +543,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
                     // delete proxy setting
                     (HostContext.GetService<IVstsAgentWebProxy>() as VstsAgentWebProxy).DeleteProxySetting();
 
-                    // delete client cert setting
+                    // delete agent cert setting
                     (HostContext.GetService<IAgentCertificateManager>() as AgentCertificateManager).DeleteCertificateSetting();
 
                     _store.DeleteSettings();
