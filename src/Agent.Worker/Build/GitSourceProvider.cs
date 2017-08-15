@@ -160,6 +160,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
         private Uri _proxyUrlWithCred = null;
         private string _proxyUrlWithCredString = null;
         private Uri _gitLfsUrlWithCred = null;
+        private bool _useSelfSignedCACert = false;
         private bool _useClientCert = false;
         private string _clientCertPrivateKeyAskPassFile = null;
 
@@ -322,18 +323,24 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
             // prepare askpass for client cert private key
             var agentCert = HostContext.GetService<IAgentCertificateManager>();
             var configUrl = new Uri(HostContext.GetService<IConfigurationStore>().GetSettings().ServerUrl);
-            if (Uri.Compare(repositoryUrl, configUrl, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) == 0 &&
-                !string.IsNullOrEmpty(agentCert.CACertificateFile) &&
-                !string.IsNullOrEmpty(agentCert.ClientCertificateFile) &&
-                !string.IsNullOrEmpty(agentCert.ClientCertificatePrivateKeyFile) &&
-                !string.IsNullOrEmpty(agentCert.ClientCertificatePassword))
+            if (Uri.Compare(repositoryUrl, configUrl, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) == 0)
             {
-                _useClientCert = true;
-                _clientCertPrivateKeyAskPassFile = Path.Combine(executionContext.Variables.Agent_TempDirectory, $"{Guid.NewGuid()}.sh");
-                List<string> askPass = new List<string>();
-                askPass.Add("#!/bin/sh");
-                askPass.Add($"ECHO \"{agentCert.ClientCertificatePassword}\"");
-                File.WriteAllLines(_clientCertPrivateKeyAskPassFile, askPass);
+                if (!string.IsNullOrEmpty(agentCert.CACertificateFile))
+                {
+                    _useSelfSignedCACert = true;
+                }
+
+                if (!string.IsNullOrEmpty(agentCert.ClientCertificateFile) &&
+                    !string.IsNullOrEmpty(agentCert.ClientCertificatePrivateKeyFile) &&
+                    !string.IsNullOrEmpty(agentCert.ClientCertificatePassword))
+                {
+                    _useClientCert = true;
+                    _clientCertPrivateKeyAskPassFile = Path.Combine(executionContext.Variables.Agent_TempDirectory, $"{Guid.NewGuid()}.sh");
+                    List<string> askPass = new List<string>();
+                    askPass.Add("#!/bin/sh");
+                    askPass.Add($"ECHO \"{agentCert.ClientCertificatePassword}\"");
+                    File.WriteAllLines(_clientCertPrivateKeyAskPassFile, askPass);
+                }
             }
 
             if (gitLfsSupport)
@@ -527,12 +534,20 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     additionalLfsFetchArgs.Add($"-c http.proxy=\"{_proxyUrlWithCredString}\"");
                 }
 
+                // Prepare self-signed CA cert config for fetch from TFS.
+                if (_useSelfSignedCACert)
+                {
+                    executionContext.Debug($"Use self-signed certificate '{agentCert.CACertificateFile}' for git fetch.");
+                    additionalFetchArgs.Add($"-c http.sslcainfo=\"{agentCert.CACertificateFile}\"");
+                    additionalLfsFetchArgs.Add($"-c http.sslcainfo=\"{agentCert.CACertificateFile}\"");
+                }
+
                 // Prepare client cert config for fetch from TFS.
                 if (_useClientCert)
                 {
                     executionContext.Debug($"Use client certificate '{agentCert.ClientCertificateFile}' for git fetch.");
-                    additionalFetchArgs.Add($"-c http.sslcainfo=\"{agentCert.CACertificateFile}\" -c http.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
-                    additionalLfsFetchArgs.Add($"-c http.sslcainfo=\"{agentCert.CACertificateFile}\" -c http.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
+                    additionalFetchArgs.Add($"-c http.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
+                    additionalLfsFetchArgs.Add($"-c http.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
                 }
 
                 // Prepare gitlfs url for fetch and checkout
@@ -666,12 +681,20 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                         additionalSubmoduleUpdateArgs.Add($"-c http.proxy=\"{_proxyUrlWithCredString}\"");
                     }
 
+                    // Prepare self-signed CA cert config for submodule update.
+                    if (_useSelfSignedCACert)
+                    {
+                        executionContext.Debug($"Use self-signed CA certificate '{agentCert.CACertificateFile}' for git submodule update.");
+                        string authorityUrl = repositoryUrl.AbsoluteUri.Replace(repositoryUrl.PathAndQuery, string.Empty);
+                        additionalSubmoduleUpdateArgs.Add($"-c http.{authorityUrl}.sslcainfo=\"{agentCert.CACertificateFile}\"");
+                    }
+
                     // Prepare client cert config for submodule update.
                     if (_useClientCert)
                     {
                         executionContext.Debug($"Use client certificate '{agentCert.ClientCertificateFile}' for git submodule update.");
                         string authorityUrl = repositoryUrl.AbsoluteUri.Replace(repositoryUrl.PathAndQuery, string.Empty);
-                        additionalSubmoduleUpdateArgs.Add($"-c http.{authorityUrl}.sslcainfo=\"{agentCert.CACertificateFile}\" -c http.{authorityUrl}.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.{authorityUrl}.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.{authorityUrl}.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
+                        additionalSubmoduleUpdateArgs.Add($"-c http.{authorityUrl}.sslcert=\"{agentCert.ClientCertificateFile}\" -c http.{authorityUrl}.sslkey=\"{agentCert.ClientCertificatePrivateKeyFile}\" -c http.{authorityUrl}.sslCertPasswordProtected=true -c core.askpass=\"{_clientCertPrivateKeyAskPassFile}\"");
                     }
                 }
 
@@ -722,13 +745,25 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                         }
                     }
 
+                    // save CA cert setting to git config.
+                    if (_useSelfSignedCACert)
+                    {
+                        executionContext.Debug($"Save CA cert config into git config.");
+                        string sslCaInfoConfigKey = "http.sslcainfo";
+                        string sslCaInfoConfigValue = $"\"{agentCert.CACertificateFile}\"";
+                        _configModifications[sslCaInfoConfigKey] = sslCaInfoConfigValue.Trim('\"');
+
+                        int exitCode_sslconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCaInfoConfigKey, sslCaInfoConfigValue);
+                        if (exitCode_sslconfig != 0)
+                        {
+                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_sslconfig}");
+                        }
+                    }
+
                     // save client cert setting to git config.
                     if (_useClientCert)
                     {
                         executionContext.Debug($"Save client cert config into git config.");
-
-                        string sslCaInfoConfigKey = "http.sslcainfo";
-                        string sslCaInfoConfigValue = $"\"{agentCert.CACertificateFile}\"";
                         string sslCertConfigKey = "http.sslcert";
                         string sslCertConfigValue = $"\"{agentCert.ClientCertificateFile}\"";
                         string sslKeyConfigKey = "http.sslkey";
@@ -738,40 +773,33 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                         string askPassConfigKey = "core.askpass";
                         string askPassConfigValue = $"\"{_clientCertPrivateKeyAskPassFile}\"";
 
-                        _configModifications[sslCaInfoConfigKey] = sslCaInfoConfigValue.Trim('\"');
                         _configModifications[sslCertConfigKey] = sslCertConfigValue.Trim('\"');
                         _configModifications[sslKeyConfigKey] = sslKeyConfigValue.Trim('\"');
                         _configModifications[sslCertPasswordProtectedConfigKey] = sslCertPasswordProtectedConfigValue.Trim('\"');
                         _configModifications[askPassConfigKey] = askPassConfigValue.Trim('\"');
 
-                        int exitCode_proxyconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCaInfoConfigKey, sslCaInfoConfigValue);
-                        if (exitCode_proxyconfig != 0)
+                        int exitCode_sslconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCertConfigKey, sslCertConfigValue);
+                        if (exitCode_sslconfig != 0)
                         {
-                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_proxyconfig}");
+                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_sslconfig}");
                         }
 
-                        exitCode_proxyconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCertConfigKey, sslCertConfigValue);
-                        if (exitCode_proxyconfig != 0)
+                        exitCode_sslconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslKeyConfigKey, sslKeyConfigValue);
+                        if (exitCode_sslconfig != 0)
                         {
-                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_proxyconfig}");
+                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_sslconfig}");
                         }
 
-                        exitCode_proxyconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslKeyConfigKey, sslKeyConfigValue);
-                        if (exitCode_proxyconfig != 0)
+                        exitCode_sslconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCertPasswordProtectedConfigKey, sslCertPasswordProtectedConfigValue);
+                        if (exitCode_sslconfig != 0)
                         {
-                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_proxyconfig}");
+                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_sslconfig}");
                         }
 
-                        exitCode_proxyconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, sslCertPasswordProtectedConfigKey, sslCertPasswordProtectedConfigValue);
-                        if (exitCode_proxyconfig != 0)
+                        exitCode_sslconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, askPassConfigKey, askPassConfigValue);
+                        if (exitCode_sslconfig != 0)
                         {
-                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_proxyconfig}");
-                        }
-
-                        exitCode_proxyconfig = await _gitCommandManager.GitConfig(executionContext, targetPath, askPassConfigKey, askPassConfigValue);
-                        if (exitCode_proxyconfig != 0)
-                        {
-                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_proxyconfig}");
+                            throw new InvalidOperationException($"Git config failed with exit code: {exitCode_sslconfig}");
                         }
                     }
                 }
