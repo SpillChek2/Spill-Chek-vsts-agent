@@ -90,7 +90,7 @@ function rundotnet ()
     dotnet_cmd=${1}
     err_handle=${2:-failed}
 
-    if [[ ( "${3}" != "" ) ]]; then
+    if [[ ( "${!3}" == "" ) ]]; then
         run_dirs=("${3}")
     else 
         run_dirs=("${!3}")
