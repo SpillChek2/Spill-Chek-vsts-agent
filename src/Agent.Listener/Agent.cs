@@ -4,11 +4,7 @@ using Microsoft.VisualStudio.Services.Agent.Util;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
-using System.Collections.Generic;
-using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 
 namespace Microsoft.VisualStudio.Services.Agent.Listener
 {
@@ -36,21 +32,8 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
             try
             {
                 var agentWebProxy = HostContext.GetService<IVstsAgentWebProxy>();
-                VssHttpMessageHandler.DefaultWebProxy = agentWebProxy;
-
-                var headerValues = new List<ProductInfoHeaderValue>();
-                headerValues.Add(new ProductInfoHeaderValue($"VstsAgentCore-{BuildConstants.AgentPackage.PackageName}", Constants.Agent.Version));
-                headerValues.Add(new ProductInfoHeaderValue($"({RuntimeInformation.OSDescription.Trim()})"));
-
-                if (VssClientHttpRequestSettings.Default.UserAgent != null && VssClientHttpRequestSettings.Default.UserAgent.Count > 0)
-                {
-                    headerValues.AddRange(VssClientHttpRequestSettings.Default.UserAgent);
-                }
-
-                VssClientHttpRequestSettings.Default.UserAgent = headerValues;
-
                 var agentCertManager = HostContext.GetService<IAgentCertificateManager>();
-                VssClientHttpRequestSettings.Default.ClientCertificateManager = agentCertManager;
+                ApiUtil.InitializeVssClientSettings(agentWebProxy, agentCertManager);
 
                 _inConfigStage = true;
                 _completedCommand.Reset();
