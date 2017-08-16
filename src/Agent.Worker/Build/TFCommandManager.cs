@@ -150,10 +150,13 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 
         public void SetupClientCertificate(string clientCert, string clientCertKey, string clientCertArchive, string clientCertPassword)
         {
+            ArgUtil.File(clientCert, nameof(clientCert));
             X509Certificate2 cert = new X509Certificate2(clientCert);
-            ExecutionContext.Debug("Set VstsClientCertificate for Tf.exe.");
+            ExecutionContext.Debug($"Set VstsClientCertificate={cert.Thumbprint} for Tf.exe to support client certificate.");
             AdditionalEnvironmentVariables["VstsClientCertificate"] = cert.Thumbprint;
-            //AdditionalEnvironmentVariables["VstsClientCertificate"] = "92a4fafa94b482c8f70e7dba94204260b7b0f9c8";
+
+            // Script Tf commands in tasks
+            ExecutionContext.SetVariable("VstsClientCertificate", cert.Thumbprint, false, false);
         }
 
         public async Task ShelveAsync(string shelveset, string commentFile, bool move)

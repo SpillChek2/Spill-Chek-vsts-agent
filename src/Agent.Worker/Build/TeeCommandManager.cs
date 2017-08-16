@@ -73,7 +73,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 
         public void SetupClientCertificate(string clientCert, string clientCertKey, string clientCertArchive, string clientCertPassword)
         {
-
+            // TEE current doesn't support client cert right now.
         }
 
         public async Task ShelveAsync(string shelveset, string commentFile, bool move)
