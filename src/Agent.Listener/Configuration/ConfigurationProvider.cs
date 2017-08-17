@@ -184,7 +184,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
 
         public async Task<TaskAgent> AddAgentAsync(AgentSettings agentSettings, TaskAgent agent, CommandSettings command)
         {
-            DeploymentMachine deploymentMachine = null;//new DeploymentMachine({ Agent = agent };
+            var deploymentMachine = new DeploymentMachine() { Agent = agent };
             deploymentMachine = await _deploymentGroupServer.AddDeploymentMachineAsync(new Guid(agentSettings.ProjectId), agentSettings.DeploymentGroupId, deploymentMachine);
 
             await GetAndAddTags(deploymentMachine, agentSettings, command);

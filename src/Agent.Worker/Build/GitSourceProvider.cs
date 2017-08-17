@@ -338,8 +338,33 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     _clientCertPrivateKeyAskPassFile = Path.Combine(executionContext.Variables.Agent_TempDirectory, $"{Guid.NewGuid()}.sh");
                     List<string> askPass = new List<string>();
                     askPass.Add("#!/bin/sh");
-                    askPass.Add($"ECHO \"{agentCert.ClientCertificatePassword}\"");
+                    askPass.Add($"echo \"{agentCert.ClientCertificatePassword}\"");
                     File.WriteAllLines(_clientCertPrivateKeyAskPassFile, askPass);
+
+#if !OS_WINDOWS
+                    var whichUtil = HostContext.GetService<IWhichUtil>();
+                    string toolPath = whichUtil.Which("chmod", true);
+                    string argLine = $"775 {_clientCertPrivateKeyAskPassFile}";
+                    executionContext.Command($"chmod {argLine}");
+
+                    var processInvoker = HostContext.CreateService<IProcessInvoker>();
+                    processInvoker.OutputDataReceived += (object sender, ProcessDataReceivedEventArgs args) =>
+                    {
+                        if (!string.IsNullOrEmpty(args.Data))
+                        {
+                            executionContext.Output(args.Data);
+                        }
+                    };
+                    processInvoker.ErrorDataReceived += (object sender, ProcessDataReceivedEventArgs args) =>
+                    {
+                        if (!string.IsNullOrEmpty(args.Data))
+                        {
+                            executionContext.Output(args.Data);
+                        }
+                    };
+
+                    await processInvoker.ExecuteAsync(executionContext.Variables.System_DefaultWorkingDirectory, toolPath, argLine, null, true, CancellationToken.None);
+#endif
                 }
             }
 
